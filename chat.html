@@ -3,11 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chat App</title>
+    <title>Chat Screen</title>
     <link rel="stylesheet" href="chat.css">
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 </head>
 <body>
-    
+    <!-- Fixed Top Bar -->
     <header class="top-bar">
         <button class="back-button" aria-label="Go back">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -18,91 +22,344 @@
         <div class="top-bar-spacer"></div>
     </header>
 
-    
+    <!-- Chat Area -->
     <main class="chat-container">
-        <div class="chat-messages">
+        <div class="chat-messages" id="chatMessages">
             
-            <div class="date-separator">
-                <span>Today</span>
-            </div>
-
-            
-            <div class="message-wrapper">
-                <div class="message message-received">
-                    <div class="message-content">
-                        <p>Hey everyone! How's it going?</p>
-                    </div>
-                    <div class="message-timestamp">10:30 AM</div>
-                </div>
-            </div>
-
-            
-            <div class="message-wrapper">
-                <div class="message message-sent">
-                    <div class="message-content">
-                        <p>Hi! I'm doing great, thanks for asking 😊</p>
-                    </div>
-                    <div class="message-timestamp">10:32 AM</div>
-                </div>
-            </div>
-
-            
-            <div class="message-wrapper">
-                <div class="message message-received">
-                    <div class="message-content">
-                        <p>That's awesome! What are you working on today?</p>
-                    </div>
-                    <div class="message-timestamp">10:33 AM</div>
-                </div>
-            </div>
-
-            
-            <div class="message-wrapper">
-                <div class="message message-sent">
-                    <div class="message-content">
-                        <p>Just building this chat interface. It's coming along nicely!</p>
-                    </div>
-                    <div class="message-timestamp">10:35 AM</div>
-                </div>
-            </div>
-
-            
-            <div class="message-wrapper">
-                <div class="message message-received">
-                    <div class="message-content">
-                        <p>Looks great! The responsive design is really smooth</p>
-                    </div>
-                    <div class="message-timestamp">10:36 AM</div>
-                </div>
-            </div>
-
-            
-            <div class="typing-indicator">
-                <div class="typing-dots">
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                </div>
-                <span>Someone is typing...</span>
-            </div>
         </div>
     </main>
 
-    
+    <!-- Input Area -->
     <footer class="input-area">
-        <form class="input-form">
+        <form class="input-form" id="messageForm">
             <input 
                 type="text" 
                 class="message-input" 
+                id="messageInput"
                 placeholder="Type a message..." 
-                maxlength="500"
+                maxlength="300"
             >
-            <button type="submit" class="send-button" aria-label="Send message">
+            <button type="submit" class="send-button" id="sendButton" aria-label="Send message">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M22 2L11 13M22 2L15 22L11 13L2 9L22 2Z"/>
                 </svg>
             </button>
         </form>
     </footer>
+
+    <script>
+        // Firebase configuration 
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        // Initialize Firebase
+        const app = firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        // Room ID (placeholder)
+        const roomId = "general-chat";
+
+        // Current user (placeholder)
+        let currentUser = null;
+        let lastReadTimestamp = null;
+
+        // Initialize anonymous authentication
+        auth.signInAnonymously()
+            .then(() => {
+                console.log("Signed in anonymously");
+            })
+            .catch((error) => {
+                console.error("Authentication error:", error);
+            });
+
+        // Listen for auth state changes
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                currentUser = user;
+                loadMessages();
+                trackReadStatus();
+            } else {
+                console.log("No user signed in");
+            }
+        });
+
+        // Load existing messages and listen for new messages in real-time
+        function loadMessages() {
+            db.collection("chatrooms")
+                .doc(roomId)
+                .collection("messages")
+                .orderBy("timestamp", "asc")
+                .onSnapshot((snapshot) => {
+                    const messagesContainer = document.getElementById('chatMessages');
+                    
+                    snapshot.docChanges().forEach((change) => {
+                        if (change.type === "added") {
+                            const message = change.doc.data();
+                            displayMessage(message);
+                            // Auto-scroll if message is from current user
+                            if (message.senderId === currentUser.uid) {
+                                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                            }
+                        }
+                    });
+                });
+
+            // Mark messages as read when chat screen is open
+            markMessagesAsRead();
+        }
+
+        // Track read status
+        function trackReadStatus() {
+            const lastReadRef = db.collection("reads").doc(currentUser.uid).collection("rooms").doc(roomId);
+            
+            // Listen for read status updates
+            lastReadRef.onSnapshot((doc) => {
+                if (doc.exists) {
+                    lastReadTimestamp = doc.data().lastReadTimestamp;
+                    updateReadReceipts();
+                }
+            });
+        }
+
+        // Mark messages as read
+        function markMessagesAsRead() {
+            const lastReadRef = db.collection("reads").doc(currentUser.uid).collection("rooms").doc(roomId);
+            lastReadRef.set({
+                lastReadTimestamp: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true }).catch((error) => {
+                console.error("Error updating read status:", error);
+            });
+        }
+
+        // Display a message in the UI
+        function displayMessage(message) {
+            const messagesContainer = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message-wrapper';
+            messageDiv.dataset.messageId = message.id;
+            
+            const isSent = message.senderId === currentUser.uid;
+            const messageClass = isSent ? 'message-sent' : 'message-received';
+            
+            const isRead = lastReadTimestamp && message.timestamp && message.timestamp.toDate() <= lastReadTimestamp.toDate();
+            const readStatus = isSent ? (isRead ? '✓✓' : '✓') : '';
+            
+            messageDiv.innerHTML = `
+                <div class="message ${messageClass}">
+                    <div class="message-content">
+                        <p>${escapeHtml(message.text)}</p>
+                    </div>
+                    <div class="message-timestamp">
+                        ${formatTime(message.timestamp)}
+                        ${isSent ? `<span class="read-receipt">${readStatus}</span>` : ''}
+                    </div>
+                </div>
+            `;
+            
+            messagesContainer.appendChild(messageDiv);
+            updateReadReceipts();
+        }
+
+        // Update read receipts
+        function updateReadReceipts() {
+            if (!lastReadTimestamp) return;
+            
+            const sentMessages = document.querySelectorAll('.message-sent');
+            sentMessages.forEach((messageEl) => {
+                const timestampEl = messageEl.querySelector('.read-receipt');
+                if (timestampEl) {
+                    const messageTime = messageEl.closest('.message-wrapper').dataset.timestamp;
+                    if (messageTime && new Date(messageTime) <= lastReadTimestamp.toDate()) {
+                        timestampEl.textContent = '✓✓';
+                    }
+                }
+            });
+        }
+
+        // Send message function
+        async function sendMessage(text) {
+            if (!text.trim() || !currentUser) return;
+
+            const messageData = {
+                id: db.collection("chatrooms").doc(roomId).collection("messages").doc().id,
+                senderId: currentUser.uid,
+                text: text.trim(),
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            };
+
+            try {
+                showSendingIndicator();
+                
+                await db.collection("chatrooms")
+                    .doc(roomId)
+                    .collection("messages")
+                    .doc(messageData.id)
+                    .set(messageData);
+                
+                hideSendingIndicator();
+                markMessagesAsRead();
+            } catch (error) {
+                console.error("Error sending message:", error);
+                hideSendingIndicator();
+                showError("Failed to send message. Please try again.");
+            }
+        }
+
+        // Show sending indicator
+        function showSendingIndicator() {
+            const sendButton = document.getElementById('sendButton');
+            sendButton.disabled = true;
+            sendButton.innerHTML = '<div class="loading-spinner"></div>';
+        }
+
+        // Hide sending indicator
+        function hideSendingIndicator() {
+            const sendButton = document.getElementById('sendButton');
+            sendButton.disabled = false;
+            sendButton.innerHTML = `
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 2L11 13M22 2L15 22L11 13L2 9L22 2Z"/>
+                </svg>
+            `;
+        }
+
+        // Show error message
+        function showError(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.textContent = message;
+            document.body.appendChild(errorDiv);
+            setTimeout(() => errorDiv.remove(), 3000);
+        }
+
+        // Show offline indication
+        function showOfflineStatus() {
+            const offlineDiv = document.createElement('div');
+            offlineDiv.className = 'offline-indicator';
+            offlineDiv.textContent = 'You are offline. Messages will be sent when connection is restored.';
+            document.body.appendChild(offlineDiv);
+        }
+
+        // Hide offline indication
+        function hideOfflineStatus() {
+            const offlineDiv = document.querySelector('.offline-indicator');
+            if (offlineDiv) offlineDiv.remove();
+        }
+
+        // Escape HTML to prevent XSS
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Format timestamp
+        function formatTime(timestamp) {
+            if (!timestamp) return 'Sending...';
+            const date = timestamp.toDate();
+            return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+
+        // Handle form submission
+        document.getElementById('messageForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const messageInput = document.getElementById('messageInput');
+            const message = messageInput.value;
+            
+            if (message.trim() && message.length <= 300) {
+                sendMessage(message);
+                messageInput.value = '';
+            }
+        });
+
+        // Handle input validation
+        document.getElementById('messageInput').addEventListener('input', (e) => {
+            const sendButton = document.getElementById('sendButton');
+            sendButton.disabled = !e.target.value.trim();
+        });
+
+        // Handle offline/online status
+        window.addEventListener('online', hideOfflineStatus);
+        window.addEventListener('offline', showOfflineStatus);
+
+        // Mark messages as read when user interacts
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+                markMessagesAsRead();
+            }
+        });
+
+        // Add CSS for new features
+        const style = document.createElement('style');
+        style.textContent = `
+            .loading-spinner {
+                width: 20px;
+                height: 20px;
+                border: 2px solid rgba(255,255,255,0.3);
+                border-radius: 50%;
+                border-top-color: white;
+                animation: spin 1s ease-in-out infinite;
+            }
+            @keyframes spin {
+                to { transform: rotate(360deg); }
+            }
+            .error-message {
+                position: fixed;
+                top: 100px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: #ff4757;
+                color: white;
+                padding: 12px 24px;
+                border-radius: 8px;
+                z-index: 1000;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            }
+            .offline-indicator {
+                position: fixed;
+                top: 90px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: #ffa502;
+                color: white;
+                padding: 12px 24px;
+                border-radius: 8px;
+                z-index: 1000;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            }
+            .read-receipt {
+                margin-left: 8px;
+                font-size: 12px;
+                color: #667eea;
+            }
+            .char-counter {
+                position: absolute;
+                bottom: -20px;
+                right: 0;
+                font-size: 12px;
+                color: #666;
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Add character counter
+        const charCounter = document.createElement('div');
+        charCounter.className = 'char-counter';
+        charCounter.textContent = '0/300';
+        document.querySelector('.input-form').appendChild(charCounter);
+
+        document.getElementById('messageInput').addEventListener('input', (e) => {
+            const length = e.target.value.length;
+            charCounter.textContent = `${length}/300`;
+            charCounter.style.color = length > 280 ? '#ff4757' : '#666';
+        });
+    </script>
 </body>
 </html>

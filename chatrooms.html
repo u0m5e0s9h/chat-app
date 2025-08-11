@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Rooms</title>
+    <link rel="stylesheet" href="chatrooms.css">
+</head>
+<body>
+    <div class="chatrooms-container">
+        <header class="chatrooms-header">
+            <h1>Chat Rooms</h1>
+            <div class="search-container">
+                <input type="text" id="searchBar" placeholder="Search rooms..." class="search-input">
+            </div>
+        </header>
+
+        <main class="chatrooms-list" id="chatroomsList">
+            <!-- Chat rooms will be dynamically loaded here -->
+        </main>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "YOUR-API-KEY",
+            authDomain: "YOUR-PROJECT.firebaseapp.com",
+            projectId: "YOUR-PROJECT-ID",
+            storageBucket: "YOUR-PROJECT.appspot.com",
+            messagingSenderId: "YOUR-SENDER-ID",
+            appId: "YOUR-APP-ID"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+
+        // Global variables
+        let currentUser = null;
+        let chatrooms = [];
+        let mutes = {};
+
+        // Initialize app
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                currentUser = user;
+                loadChatrooms();
+                loadMutes();
+            } else {
+                auth.signInAnonymously();
+            }
+        });
+
+        // Load chatrooms
+        async function loadChatrooms() {
+            const chatroomsRef = db.collection('chatrooms');
+            const snapshot = await chatroomsRef.get();
+            
+            chatrooms = [];
+            const promises = [];
+            
+            snapshot.forEach(doc => {
+                const roomData = doc.data();
+                const roomId = doc.id;
+                
+                // Get last message
+                const lastMessagePromise = db.collection('chatrooms')
+                    .doc(roomId)
+                    .collection('messages')
+                    .orderBy('timestamp', 'desc')
+                    .limit(1)
+                    .get();
+                
+                // Get last read timestamp
+                const lastReadPromise = db.collection('reads')
+                    .doc(currentUser.uid)
+                    .collection(roomId)
+                    .doc('lastRead')
+                    .get();
+                
+                promises.push(
+                    Promise.all([lastMessagePromise, lastReadPromise])
+                        .then(([messageSnapshot, lastReadSnapshot]) => {
+                            const lastMessage = messageSnapshot.docs[0]?.data();
+                            const lastRead = lastReadSnapshot.data()?.timestamp || new Date(0);
+                            
+                            return {
+                                id: roomId,
+                                title: roomData.title || `Room ${roomId}`,
+                                lastMessage: lastMessage,
+                                lastReadTimestamp: lastRead,
+                                unreadCount: 0 // Will be calculated
+                            };
+                        })
+                );
+            });
+            
+            Promise.all(promises).then(results => {
+                chatrooms = results;
+                renderChatrooms();
+            });
+        }
+
+        // Load mute status
+        async function loadMutes() {
+            const mutesRef = db.collection('mutes').doc(currentUser.uid).collection('rooms');
+            const snapshot = await mutesRef.get();
+            
+            mutes = {};
+            snapshot.forEach(doc => {
+                mutes[doc.id] = doc.data().muted || false;
+            });
+            
+            renderChatrooms();
+        }
+
+        // Render chatrooms
+        function renderChatrooms() {
+            const container = document.getElementById('chatroomsList');
+            const searchTerm = document.getElementById('searchBar').value.toLowerCase();
+            
+            const filteredRooms = chatrooms.filter(room => 
+                room.title.toLowerCase().includes(searchTerm)
+            );
+            
+            container.innerHTML = '';
+            
+            filteredRooms.forEach(room => {
+                const isMuted = mutes[room.id] || false;
+                const lastMessage = room.lastMessage;
+                const lastRead = room.lastReadTimestamp;
+                const unreadCount = lastMessage ? 
+                    (lastMessage.timestamp?.toDate() > lastRead?.toDate() ? 1 : 0) : 0;
+                
+                const roomElement = document.createElement('div');
+                roomElement.className = `chatroom-item ${isMuted ? 'muted' : ''}`;
+                roomElement.dataset.roomId = room.id;
+                
+                roomElement.innerHTML = `
+                    <div class="room-info">
+                        <h3 class="room-title">${room.title}</h3>
+                        ${lastMessage ? `
+                            <p class="last-message">${lastMessage.text || 'No messages yet'}</p>
+                            <span class="timestamp">${formatTimestamp(lastMessage.timestamp)}</span>
+                        ` : '<p class="no-messages">No messages yet</p>'}
+                    </div>
+                    <div class="room-controls">
+                        ${unreadCount > 0 ? `<span class="unread-count">${unreadCount}</span>` : ''}
+                        <button class="mute-toggle ${isMuted ? 'muted' : ''}" 
+                                onclick="toggleMute('${room.id}')">
+                            ${isMuted ? '🔇' : '🔊'}
+                        </button>
+                    </div>
+                `;
+                
+                roomElement.addEventListener('click', () => {
+                    if (!isMuted) {
+                        window.location.href = `chat.html?room=${room.id}`;
+                    }
+                });
+                
+                // Long press for desktop
+                let pressTimer;
+                roomElement.addEventListener('mousedown', () => {
+                    pressTimer = setTimeout(() => toggleMute(room.id), 800);
+                });
+                roomElement.addEventListener('mouseup', () => clearTimeout(pressTimer));
+                roomElement.addEventListener('mouseleave', () => clearTimeout(pressTimer));
+                
+                // Touch for mobile
+                roomElement.addEventListener('touchstart', () => {
+                    pressTimer = setTimeout(() => toggleMute(room.id), 800);
+                });
+                roomElement.addEventListener('touchend', () => clearTimeout(pressTimer));
+                
+                container.appendChild(roomElement);
+            });
+        }
+
+        // Toggle mute
+        async function toggleMute(roomId) {
+            const isMuted = !mutes[roomId];
+            const muteRef = db.collection('mutes').doc(currentUser.uid).collection('rooms').doc(roomId);
+            
+            await muteRef.set({ muted: isMuted });
+            mutes[roomId] = isMuted;
+            renderChatrooms();
+        }
+
+        // Format timestamp
+        function formatTimestamp(timestamp) {
+            if (!timestamp) return '';
+            const date = timestamp.toDate();
+            return date.toLocaleString();
+        }
+
+        // Search functionality
+        document.getElementById('searchBar').addEventListener('input', renderChatrooms);
+
+        // Pin functionality (stretch task)
+        async function togglePin(roomId) {
+            const pinRef = db.collection('pins').doc(currentUser.uid).collection('rooms').doc(roomId);
+            const doc = await pinRef.get();
+            
+            if (doc.exists) {
+                await pinRef.delete();
+            } else {
+                await pinRef.set({ pinned: true, pinnedAt: firebase.firestore.FieldValue.serverTimestamp() });
+            }
+            
+            loadChatrooms();
+        }
+    </script>
+</body>
+</html>
