@@ -17,36 +17,23 @@
 
     <!-- Chat Messages Area -->
     <div class="chat-area">
-      <!-- Date Separator -->
-      <div class="date-separator">August 8, 2025</div>
-
-      <!-- Received Message -->
-      <div class="message-row received">
-        <div class="message-bubble">
-          Hello! How are you?
-          <span class="timestamp">10:00 AM</span>
-        </div>
-      </div>
-
-      <!-- Sent Message -->
-      <div class="message-row sent">
-        <div class="message-bubble">
-          I'm good, thanks! And you?
-          <span class="timestamp">10:01 AM</span>
-        </div>
-      </div>
-
-      <!-- Typing Indicator -->
-      <div class="message-row received">
-        <div class="message-bubble typing">Typing...</div>
-      </div>
+      <!-- Messages will be loaded dynamically -->
     </div>
 
     <!-- Input Field -->
     <footer class="input-bar">
-      <input type="text" placeholder="Type your message..." />
+      <input type="text" placeholder="Type your message..." maxlength="300" />
       <button class="send-button">Send</button>
     </footer>
   </div>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+  
+  <!-- App scripts -->
+  <script src="firebase-config.js"></script>
+  <script src="chat-firebase.js"></script>
 </body>
 </html>
