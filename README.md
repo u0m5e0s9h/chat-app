@@ -132,33 +132,33 @@ if (text.length > MAX_LENGTH) {
 
 ## What was implemented today
 
-### ✅ Real-Time Listener Enhancements
+###  Real-Time Listener Enhancements
 - **Optimized onSnapshot listener** for better performance
 - **Real-time message updates** without page refresh
 - **Efficient message rendering** with proper state management
 
-### ✅ Read Status Tracking
+###  Read Status Tracking
 - **Firestore reads collection**: `/reads/{userId}/rooms/{roomId}`
 - **Last read timestamp** tracking for each user
 - **Automatic read marking** when chat is active
 - **Real-time read status updates**
 
-### ✅ Read Receipts
+###  Read Receipts
 - **Visual checkmarks** next to messages (✓ for sent, ✓✓ for read)
 - **Real-time read status updates**
 - **Different states** for sent vs read messages
 
-### ✅ Auto-Scroll Optimization
+###  Auto-Scroll Optimization
 - **Smart scrolling** that only scrolls for current user's messages
 - **Manual scroll preservation** when reading old messages
 - **Smooth scroll behavior** for better UX
 
-### ✅ Offline Handling
+###  Offline Handling
 - **Connection status indicator** (Online/Offline)
 - **Browser network event listeners** for WiFi changes
 - **Visual feedback** when connection is lost
 
-### ✅ Enhanced Firestore Structure
+###  Enhanced Firestore Structure
 - **Messages collection** with readBy array
 - **Reads collection** for tracking user read status
 - **Batch updates** for marking multiple messages as read
