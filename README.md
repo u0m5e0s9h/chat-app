@@ -22,6 +22,5 @@
    - The "Someone is typing..." indicator is shown statically.
    - Input field and send button are visible at the bottom.
 3. Resize the browser window or open on a mobile device to test responsiveness.
-4. Interact with the input field and buttons (note: this is a static UI, no actual message sending functionality).
+4. Interact with the input field and buttons .
 
-This completes the Day 1 Chat UI Layout implementation and testing instructions.
