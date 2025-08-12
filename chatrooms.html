@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Rooms</title>
+    <link rel="stylesheet" href="chat.css">
+    <link rel="stylesheet" href="chatrooms.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="chatrooms-container">
+        <!-- Search Bar -->
+        <div class="search-bar">
+            <i class="fas fa-search search-icon"></i>
+            <input type="text" class="search-input" placeholder="Search rooms..." id="searchInput">
+        </div>
+
+        <!-- Rooms List -->
+        <ul class="rooms-list" id="roomsList">
+            <!-- Rooms will be populated here -->
+        </ul>
+
+        <!-- Empty State -->
+        <div class="empty-state" id="emptyState" style="display: none;">
+            <i class="fas fa-comments"></i>
+            <h3>No rooms found</h3>
+            <p>No chat rooms available or matching your search.</p>
+        </div>
+    </div>
+
+    <!-- Long Press Indicator -->
+    <div class="long-press-indicator" id="longPressIndicator">
+        Long press to mute/unmute
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    
+    <!-- App scripts -->
+    <script src="firebase-config.js"></script>
+    <script>
+        // ChatRooms class to manage room list
+        class ChatRoomsManager {
+            constructor() {
+                this.rooms = [];
+                this.filteredRooms = [];
+                this.mutedRooms = new Set();
+                this.pinnedRooms = new Set();
+                this.currentUser = null;
+                this.longPressTimer = null;
+                this.swipeStartX = 0;
+                this.swipeCurrentX = 0;
+                this.isSwiping = false;
+                
+                this.init();
+            }
+
+            async init() {
+                try {
+                    await this.signInAnonymously();
+                    await this.loadUserPreferences();
+                    await this.loadRooms();
+                    this.setupEventListeners();
+                    this.setupSwipeGestures();
+                } catch (error) {
+                    console.error("Failed to initialize chat rooms:", error);
+                    this.showError("Failed to load chat rooms. Please refresh.");
+                }
+            }
+
+            async signInAnonymously() {
+                try {
+                    const result = await auth.signInAnonymously();
+                    this.currentUser = result.user;
+                    console.log("Signed in anonymously:", this.currentUser.uid);
+                    return this.currentUser;
+                } catch (error) {
+                    console.error("Authentication error:", error);
+                    throw error;
+                }
+            }
+
+            async loadUserPreferences() {
+                if (!this.currentUser) return;
+
+                try {
+                    // Load muted rooms
+                    const mutesRef = db.collection('mutes').doc(this.currentUser.uid);
+                    const mutesDoc = await mutesRef.get();
+                    
+                    if (mutesDoc.exists) {
+                        const mutesData = mutesDoc.data();
+                        this.mutedRooms = new Set(Object.keys(mutesData).filter(key => mutesData[key]));
+                    }
+
+                    // Load pinned rooms
+                    const pinsRef = db.collection('pins').doc(this.currentUser.uid);
+                    const pinsDoc = await pinsRef.get();
+                    
+                    if (pinsDoc.exists) {
+                        const pinsData = pinsDoc.data();
+                        this.pinnedRooms = new Set(Object.keys(pinsData).filter(key => pinsData[key]));
+                    }
+
+                } catch (error) {
+                    console.error("Error loading user preferences:", error);
+                }
+            }
+
+            async loadRooms() {
+                try {
+                    // Get all chatrooms
+                    const roomsSnapshot = await db.collection('chatrooms').get();
+                    
+                    this.rooms = [];
+                    for (const roomDoc of roomsSnapshot.docs) {
+                        const roomData = roomDoc.data();
+                        const lastMessage = await this.getLastMessage(roomDoc.id);
+                        
+                        const room = {
+                            id: roomDoc.id,
+                            title: roomData.title || roomDoc.id,
+                            lastMessage: lastMessage,
+                            unreadCount: 0,
+                            isMuted: this.mutedRooms.has(roomDoc.id),
+                            isPinned: this.pinnedRooms.has(roomDoc.id)
+                        };
+                        
+                        // Calculate unread count
+                        if (lastMessage && this.currentUser) {
+                            room.unreadCount = await this.getUnreadCount(roomDoc.id);
+                        }
+                        
+                        this.rooms.push(room);
+                    }
+                    
+                    // Sort rooms: pinned first, then by last message time
+                    this.sortRooms();
+                    this.renderRooms();
+                    
+                } catch (error) {
+                    console.error("Error loading rooms:", error);
+                }
+            }
+
+            async getLastMessage(roomId) {
+                try {
+                    const messagesRef = db.collection('chatrooms').doc(roomId).collection('messages');
+                    const lastMessageQuery = await messagesRef
+                        .orderBy('timestamp', 'desc')
+                        .limit(1)
+                        .get();
+                    
+                    if (!lastMessageQuery.empty) {
+                        const messageDoc = lastMessageQuery.docs[0];
+                        return {
+                            id: messageDoc.id,
+                            ...messageDoc.data(),
+                            timestamp: messageDoc.data().timestamp?.toDate?.() || new Date()
+                        };
+                    }
+                    return null;
+                } catch (error) {
+                    console.error("Error getting last message:", error);
+                    return null;
+                }
+            }
+
+            async getUnreadCount(roomId) {
+                try {
+                    const readsRef = db.collection('reads').doc(this.currentUser.uid).collection('rooms').doc(roomId);
+                    const readsDoc = await readsRef.get();
+                    
+                    let lastReadTimestamp = null;
+                    if (readsDoc.exists) {
+                        lastReadTimestamp = readsDoc.data().lastRead?.toDate?.() || null;
+                    }
+
+                    const messagesRef = db.collection('chatrooms').doc(roomId).collection('messages');
+                    let unreadQuery = messagesRef.where('senderId', '!=', this.currentUser.uid);
+                    
+                    if (lastReadTimestamp) {
+                        unreadQuery = unreadQuery.where('timestamp', '>', lastReadTimestamp);
+                    }
+
+                    const unreadSnapshot = await unreadQuery.get();
+                    return unreadSnapshot.size;
+                    
+                } catch (error) {
+                    console.error("Error getting unread count:", error);
+                    return 0;
+                }
+            }
+
+            sortRooms() {
+                this.rooms.sort((a, b) => {
+                    // Pinned rooms first
+                    if (a.isPinned && !b.isPinned) return -1;
+                    if (!a.isPinned && b.isPinned) return 1;
+                    
+                    // Then by last message time
+                    const timeA = a.lastMessage?.timestamp?.getTime?.() || 0;
+                    const timeB = b.lastMessage?.timestamp?.getTime?.() || 0;
+                    return timeB - timeA;
+                });
+            }
+
+            renderRooms(filteredRooms = null) {
+                const roomsToRender = filteredRooms || this.rooms;
+                const roomsList = document.getElementById('roomsList');
+                const emptyState = document.getElementById('emptyState');
+
+                if (roomsToRender.length === 0) {
+                    roomsList.innerHTML = '';
+                    emptyState.style.display = 'block';
+                    return;
+                }
+
+                emptyState.style.display = 'none';
+                roomsList.innerHTML = '';
+
+                roomsToRender.forEach(room => {
+                    const roomElement = this.createRoomElement(room);
+                    roomsList.appendChild(roomElement);
+                });
+            }
+
+            createRoomElement(room) {
+                const li = document.createElement('li');
+                li.className = `room-item ${room.isPinned ? 'pinned' : ''} ${room.isMuted ? 'muted' : ''}`;
+                li.setAttribute('data-room-id', room.id);
+
+                const lastMessageTime = room.lastMessage?.timestamp 
+                    ? this.formatTime(room.lastMessage.timestamp) 
+                    : 'No messages';
+
+                const lastMessageText = room.lastMessage?.text 
+                    ? (room.lastMessage.text.length > 50 
+                        ? room.lastMessage.text.substring(0, 50) + '...' 
+                        : room.lastMessage.text)
+                    : 'No messages yet';
+
+                li.innerHTML = `
+                    <div class="room-avatar">${room.title.charAt(0).toUpperCase()}</div>
+                    <div class="room-info">
+                        <div class="room-header">
+                            <div class="room-title">${this.escapeHtml(room.title)}</div>
+                            <div class="room-time">${lastMessageTime}</div>
+                        </div>
+                        <div class="room-preview">${this.escapeHtml(lastMessageText)}</div>
+                        <div class="room-meta">
+                            ${room.unreadCount > 0 ? `<span class="unread-badge">${room.unreadCount}</span>` : ''}
+                            <button class="pin-button ${room.isPinned ? 'pinned' : ''}" title="${room.isPinned ? 'Unpin' : 'Pin'}">
+                                <i class="fas fa-thumbtack"></i>
+                            </button>
+                            <button class="mute-toggle ${room.isMuted ? 'muted' : ''}" title="${room.isMuted ? 'Unmute' : 'Mute'}">
+                                <i class="fas ${room.isMuted ? 'fa-bell-slash' : 'fa-bell'}"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+
+                // Event listeners
+                li.addEventListener('click', (e) => {
+                    if (e.target.closest('.mute-toggle') || e.target.closest('.pin-button')) return;
+                    this.openRoom(room.id);
+                });
+
+                const muteToggle = li.querySelector('.mute-toggle');
+                muteToggle.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.toggleMute(room.id);
+                });
+
+                const pinButton = li.querySelector('.pin-button');
+                pinButton.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.togglePin(room.id);
+                });
+
+                return li;
+            }
+
+            setupEventListeners() {
+                const searchInput = document.getElementById('searchInput');
+                searchInput.addEventListener('input', (e) => {
+                    this.filterRooms(e.target.value);
+                });
+            }
+
+            filterRooms(searchTerm) {
+                if (!searchTerm.trim()) {
+                    this.filteredRooms = [...this.rooms];
+                } else {
+                    this.filteredRooms = this.rooms.filter(room =>
+                        room.title.toLowerCase().includes(searchTerm.toLowerCase())
+                    );
+                }
+                this.renderRooms(this.filteredRooms);
+            }
+
+            setupSwipeGestures() {
+                const roomsList = document.getElementById('roomsList');
+                
+                // Touch events for mobile swipe
+                roomsList.addEventListener('touchstart', this.handleTouchStart.bind(this));
+                roomsList.addEventListener('touchmove', this.handleTouchMove.bind(this));
+                roomsList.addEventListener('touchend', this.handleTouchEnd.bind(this));
+
+                // Mouse events for desktop long press simulation
+                roomsList.addEventListener('mousedown', this.handleMouseDown.bind(this));
+                roomsList.addEventListener('mouseup', this.handleMouseUp.bind(this));
+                roomsList.addEventListener('mouseleave', this.handleMouseUp.bind(this));
+            }
+
+            handleTouchStart(e) {
+                if (!e.target.closest('.room-item')) return;
+                
+                const roomItem = e.target.closest('.room-item');
+                this.swipeStartX = e.touches[0].clientX;
+                this.isSwiping = true;
+            }
+
+            handleTouchMove(e) {
+                if (!this.isSwiping) return;
+                
+                const roomItem = e.target.closest('.room-item');
+                if (!roomItem) return;
+
+                this.swipeCurrentX = e.touches[0].clientX;
+                const diff = this.swipeStartX - this.swipeCurrentX;
+
+                if (diff > 50) {
+                    roomItem.classList.add('swiping');
+                }
+            }
+
+            handleTouchEnd(e) {
+                if (!this.isSwiping) return;
+                
+                const roomItem = e.target.closest('.room-item');
+                if (!roomItem) return;
+
+                const roomId = roomItem.getAttribute('data-room-id');
+                const diff = this.swipeStartX - this.swipeCurrentX;
+
+                if (diff > 50) {
+                    this.toggleMute(roomId);
+                }
+
+                roomItem.classList.remove('swiping');
+                this.isSwiping = false;
+            }
+
+            handleMouseDown(e) {
+                if (!e.target.closest('.room-item')) return;
+                
+                const roomItem = e.target.closest('.room-item');
+                const roomId = roomItem.getAttribute('data-room-id');
+                
+                this.longPressTimer = setTimeout(() => {
+                    this.toggleMute(roomId);
+                    this.showLongPressIndicator();
+                }, 800);
+            }
+
+            handleMouseUp(e) {
+                if (this.longPressTimer) {
+                    clearTimeout(this.longPressTimer);
+                    this.longPressTimer = null;
+                }
+            }
+
+            showLongPressIndicator() {
+                const indicator = document.getElementById('longPressIndicator');
+                indicator.style.display = 'block';
+                setTimeout(() => {
+                    indicator.style.display = 'none';
+                }, 1500);
+            }
+
+            async toggleMute(roomId) {
+                try {
+                    const room = this.rooms.find(r => r.id === roomId);
+                    if (!room) return;
+
+                    const newMutedState = !room.isMuted;
+                    room.isMuted = newMutedState;
+
+                    // Update Firebase
+                    const mutesRef = db.collection('mutes').doc(this.currentUser.uid);
+                    await mutesRef.set({
+                        [roomId]: newMutedState
+                    }, { merge: true });
+
+                    // Update local state
+                    if (newMutedState) {
+                        this.mutedRooms.add(roomId);
+                    } else {
+                        this.mutedRooms.delete(roomId);
+                    }
+
+                    this.renderRooms();
+                    
+                } catch (error) {
+                    console.error("Error toggling mute:", error);
+                }
+            }
+
+            async togglePin(roomId) {
+                try {
+                    const room = this.rooms.find(r => r.id === roomId);
+                    if (!room) return;
+
+                    const newPinnedState = !room.isPinned;
+                    room.isPinned = newPinnedState;
+
+                    // Update Firebase
+                    const pinsRef = db.collection('pins').doc(this.currentUser.uid);
+                    await pinsRef.set({
+                        [roomId]: newPinnedState
+                    }, { merge: true });
+
+                    // Update local state
+                    if (newPinnedState) {
+                        this.pinnedRooms.add(roomId);
+                    } else {
+                        this.pinnedRooms.delete(roomId);
+                    }
+
+                    this.sortRooms();
+                    this.renderRooms();
+                    
+                } catch (error) {
+                    console.error("Error toggling pin:", error);
+                }
+            }
+
+            openRoom(roomId) {
+                window.location.href = `chat.html?room=${roomId}`;
+            }
+
+            formatTime(date) {
+                const now = new Date();
+                const messageDate = new Date(date);
+                const diffMs = now - messageDate;
+                const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+                if (diffDays === 0) {
+                    return messageDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                } else if (diffDays === 1) {
+                    return 'Yesterday';
+                } else if (diffDays < 7) {
+                    return messageDate.toLocaleDateString([], { weekday: 'short' });
+                } else {
+                    return messageDate.toLocaleDateString([], { month: 'short', day: 'numeric' });
+                }
+            }
+
+            escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+
+            showError(message) {
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'error-message';
+                errorDiv.textContent = message;
+                errorDiv.style.cssText = `
+                    background: #ffebee;
+                    color: #c62828;
+                    padding: 10px;
+                    margin: 10px;
+                    border-radius: 5px;
+                    text-align: center;
+                `;
+                document.body.appendChild(errorDiv);
+                setTimeout(() => errorDiv.remove(), 3000);
+            }
+        }
+
+        // Initialize the app
+        document.addEventListener('DOMContentLoaded', () => {
+            new ChatRoomsManager();
+        });
+    </script>
+</body>
+</html>
