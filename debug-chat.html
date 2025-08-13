@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Debug Chat Room</title>
+  <link rel="stylesheet" href="./chat.css" />
+</head>
+<body>
+  <div class="chat-container">
+    <header class="top-bar">
+      <button class="back-button">←</button>
+      <h1 class="room-title">Debug Chat Room</h1>
+    </header>
+
+    <div class="chat-area">
+      <p>Debug: Open console to see logs</p>
+    </div>
+
+    <div id="imagePreview" class="image-preview" style="display: none;">
+      <img id="previewImage" src="" alt="Preview">
+      <button id="cancelImage" class="cancel-btn">×</button>
+      <div class="upload-progress" style="display: none;">
+        <div class="progress-bar">
+          <div class="progress-fill"></div>
+        </div>
+        <span class="progress-text">0%</span>
+      </div>
+    </div>
+
+    <footer class="input-bar">
+      <input type="text" id="messageInput" placeholder="Type your message..." maxlength="300" />
+      <input type="file" id="imageInput" accept="image/*" style="display: none;">
+      <button id="imageButton" class="image-button" title="Send image">
+        📷
+      </button>
+      <button id="sendButton" class="send-button">Send</button>
+    </footer>
+  </div>
+
+  <script>
+    // Simple debug script
+    console.log('Debug: Page loaded');
+    
+    // Check if elements exist
+    const elements = {
+      imageButton: document.querySelector('.image-button'),
+      imageInput: document.querySelector('#imageInput'),
+      messageInput: document.querySelector('#messageInput'),
+      sendButton: document.querySelector('.send-button'),
+      imagePreview: document.querySelector('#imagePreview'),
+      previewImage: document.querySelector('#previewImage'),
+      cancelImage: document.querySelector('#cancelImage')
+    };
+    
+    console.log('Elements found:', elements);
+    
+    // Add debug event listeners
+    if (elements.imageButton) {
+      elements.imageButton.addEventListener('click', () => {
+        console.log('Image button clicked');
+        if (elements.imageInput) {
+          elements.imageInput.click();
+          console.log('File input triggered');
+        } else {
+          console.error('Image input not found');
+        }
+      });
+    } else {
+      console.error('Image button not found');
+    }
+    
+    if (elements.imageInput) {
+      elements.imageInput.addEventListener('change', (e) => {
+        console.log('File selected:', e.target.files[0]);
+        if (e.target.files[0]) {
+          const file = e.target.files[0];
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            elements.previewImage.src = e.target.result;
+            elements.imagePreview.style.display = 'block';
+            console.log('Preview shown');
+          };
+          reader.readAsDataURL(file);
+        }
+      });
+    }
+    
+    // Test button visibility
+    setTimeout(() => {
+      console.log('Testing button visibility...');
+      Object.keys(elements).forEach(key => {
+        console.log(`${key}:`, elements[key], elements[key] ? 'visible' : 'not found');
+      });
+    }, 1000);
+  </script>
+</body>
+</html>

@@ -24,6 +24,9 @@
 3. Resize the browser window or open on a mobile device to test responsiveness.
 4. Interact with the input field and buttons .
 
+<img width="1917" height="875" alt="Screenshot 2025-08-12 195738" src="https://github.com/user-attachments/assets/5502f704-8cd0-414f-aa28-6220211ec343" />
+
+
 #  Day 2 Chat Application with Firebase
 
 A modern chat room application with Firebase integration for real-time messaging.
@@ -78,6 +81,7 @@ service cloud.firestore {
   }
 }
 ```
+<img width="1913" height="885" alt="Screenshot 2025-08-12 221403" src="https://github.com/user-attachments/assets/ed6852ae-0814-4f22-b232-debb10d49f65" />
 
 ### 4. Run the Application
 
@@ -162,6 +166,9 @@ if (text.length > MAX_LENGTH) {
 - **Messages collection** with readBy array
 - **Reads collection** for tracking user read status
 - **Batch updates** for marking multiple messages as read
+
+  <img width="1903" height="879" alt="Screenshot 2025-08-12 235911" src="https://github.com/user-attachments/assets/f7749f7b-d40a-4906-a200-86987821aac3" />
+
 
 ## How to run and test the app
 
@@ -262,3 +269,42 @@ service cloud.firestore {
 - Check Firestore connection
 - Verify security rules allow reads
 - Check console for JavaScript errors
+
+
+# Day 4 –Chatroom List + Mute / Search
+
+<img width="1821" height="901" alt="Screenshot 2025-08-13 022415" src="https://github.com/user-attachments/assets/a182e092-ea26-4449-983b-b8f06b96f5aa" />
+
+<img width="1795" height="866" alt="Screenshot 2025-08-13 022432" src="https://github.com/user-attachments/assets/954bd6a5-3e59-45d7-8457-e11d949705e9" />
+
+## Objective
+Build a chatroom list page and allow per-room mute control.
+
+---
+
+## What Was Implemented Today
+- Created `chatrooms.html` page to display available chatrooms.
+- Displayed:
+  - **Room Title**
+  - **Last Message Preview**
+  - **Timestamp** of last message
+  - **Unread Count** based on `lastReadTimestamp`
+- Added **Mute Toggle** per room.
+- Mute status stored in **`/mutes/{userId}/{roomId}`** collection in Firebase.
+- Implemented **Search Bar** at the top to filter rooms by title in real time.
+- Data fetched dynamically from Firestore for real-time updates.
+
+---
+
+## Firebase Collections & Data Format Used
+
+### `/chatrooms`
+```json
+{
+  "id": "roomId123",
+  "title": "General Chat",
+  "lastMessage": "Hello there!",
+  "lastMessageTimestamp": "2025-08-13T15:45:00Z"
+}
+
+# Day 5 -

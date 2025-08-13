@@ -2,16 +2,22 @@
 const urlParams = new URLSearchParams(window.location.search);
 const roomId = urlParams.get('roomId');
 
+// Handle missing room ID
 if (!roomId) {
-  alert('No room ID provided');
-  window.location.href = 'chatrooms.html';
+  const savedRoomId = localStorage.getItem('lastRoomId');
+  if (savedRoomId) {
+    window.location.href = `chat.html?roomId=${savedRoomId}`;
+  } else {
+    alert('No room ID provided. Redirecting to chat rooms...');
+    window.location.href = 'chatrooms.html';
+  }
 }
 
-// DOM elements
+// DOM elements - using correct selectors
 const chatArea = document.querySelector('.chat-area');
 const messageInput = document.querySelector('#messageInput');
-const sendButton = document.querySelector('#sendButton');
-const imageButton = document.querySelector('#imageButton');
+const sendButton = document.querySelector('.send-button');
+const imageButton = document.querySelector('.image-button');
 const imageInput = document.querySelector('#imageInput');
 const imagePreview = document.querySelector('#imagePreview');
 const previewImage = document.querySelector('#previewImage');
@@ -30,6 +36,7 @@ firebaseAuth.onAuthStateChanged((user) => {
     currentUser = user;
     loadMessages();
     setupMessageListener();
+    localStorage.setItem('lastRoomId', roomId);
   } else {
     window.location.href = 'index.html';
   }
@@ -65,7 +72,7 @@ function loadMessages() {
     });
 }
 
-// Setup real-time listener for new messages
+// Setup real-time listener
 function setupMessageListener() {
   firebaseDB.collection('chatrooms')
     .doc(roomId)
@@ -78,7 +85,6 @@ function setupMessageListener() {
           const message = change.doc.data();
           const messageId = change.doc.id;
           
-          // Check if message already exists
           const existingMessage = document.querySelector(`[data-id="${messageId}"]`);
           if (!existingMessage) {
             displayMessage(messageId, message);
@@ -89,7 +95,7 @@ function setupMessageListener() {
     });
 }
 
-// Display a single message
+// Display message
 function displayMessage(messageId, message) {
   const messageDiv = document.createElement('div');
   messageDiv.className = `message-row ${message.senderId === currentUser.uid ? 'sent' : 'received'}`;
@@ -99,7 +105,6 @@ function displayMessage(messageId, message) {
   bubbleDiv.className = 'message-bubble';
   
   if (message.imageUrl) {
-    // Image message
     const img = document.createElement('img');
     img.src = message.imageUrl;
     img.alt = 'Shared image';
@@ -113,7 +118,6 @@ function displayMessage(messageId, message) {
       bubbleDiv.appendChild(textDiv);
     }
   } else {
-    // Text message
     bubbleDiv.textContent = message.text;
   }
   
@@ -149,7 +153,7 @@ function scrollToBottom() {
   chatArea.scrollTop = chatArea.scrollHeight;
 }
 
-// Send text message
+// Send message
 function sendMessage(text, imageUrl = null) {
   if (!text.trim() && !imageUrl) return;
   
@@ -177,7 +181,6 @@ function compressImage(file, maxWidth = 1280, maxHeight = 1280, quality = 0.8) {
         const canvas = document.createElement('canvas');
         let { width, height } = img;
         
-        // Calculate new dimensions
         if (width > maxWidth || height > maxHeight) {
           const ratio = Math.min(maxWidth / width, maxHeight / height);
           width *= ratio;
@@ -204,23 +207,18 @@ function compressImage(file, maxWidth = 1280, maxHeight = 1280, quality = 0.8) {
 async function uploadImage(file) {
   if (!file) return null;
   
-  // Check file size (5MB limit)
   if (file.size > 5 * 1024 * 1024) {
     alert('File size must be less than 5MB');
     return null;
   }
   
   try {
-    // Compress image
     const compressedFile = await compressImage(file);
-    
     const messageId = Date.now().toString();
     const storageRef = firebaseStorage.ref();
     const imageRef = storageRef.child(`chatrooms/${roomId}/images/${messageId}.jpg`);
     
     const uploadTask = imageRef.put(compressedFile);
-    
-    // Show progress
     uploadProgress.style.display = 'block';
     
     return new Promise((resolve, reject) => {
@@ -250,58 +248,82 @@ async function uploadImage(file) {
 }
 
 // Event listeners
-sendButton.addEventListener('click', async () => {
-  const text = messageInput.value.trim();
+document.addEventListener('DOMContentLoaded', () => {
+  console.log('Chat initialized with room ID:', roomId);
   
-  if (selectedImageFile) {
-    // Send image message
-    const imageUrl = await uploadImage(selectedImageFile);
-    if (imageUrl) {
-      await sendMessage(text, imageUrl);
-      messageInput.value = '';
-      hideImagePreview();
-    }
-  } else if (text) {
-    // Send text message
-    await sendMessage(text);
-    messageInput.value = '';
+  // Send button click
+  if (sendButton) {
+    sendButton.addEventListener('click', async () => {
+      const text = messageInput.value.trim();
+      
+      if (selectedImageFile) {
+        const imageUrl = await uploadImage(selectedImageFile);
+        if (imageUrl) {
+          await sendMessage(text, imageUrl);
+          messageInput.value = '';
+          hideImagePreview();
+        }
+      } else if (text) {
+        await sendMessage(text);
+        messageInput.value = '';
+      }
+    });
+  }
+  
+  // Enter key press
+  if (messageInput) {
+    messageInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        sendButton.click();
+      }
+    });
+  }
+  
+  // Image button click
+  if (imageButton) {
+    imageButton.addEventListener('click', () => {
+      if (imageInput) {
+        imageInput.click();
+      }
+    });
+  }
+  
+  // Image selection
+  if (imageInput) {
+    imageInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file && file.type.startsWith('image/')) {
+        selectedImageFile = file;
+        
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          previewImage.src = e.target.result;
+          imagePreview.style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+  }
+  
+  // Cancel image
+  if (cancelImage) {
+    cancelImage.addEventListener('click', hideImagePreview);
+  }
+  
+  // Back button
+  const backButton = document.querySelector('.back-button');
+  if (backButton) {
+    backButton.addEventListener('click', () => {
+      window.location.href = 'chatrooms.html';
+    });
   }
 });
-
-messageInput.addEventListener('keypress', (e) => {
-  if (e.key === 'Enter') {
-    sendButton.click();
-  }
-});
-
-imageButton.addEventListener('click', () => {
-  imageInput.click();
-});
-
-imageInput.addEventListener('change', (e) => {
-  const file = e.target.files[0];
-  if (file && file.type.startsWith('image/')) {
-    selectedImageFile = file;
-    
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      previewImage.src = e.target.result;
-      imagePreview.style.display = 'block';
-    };
-    reader.readAsDataURL(file);
-  }
-});
-
-cancelImage.addEventListener('click', hideImagePreview);
 
 function hideImagePreview() {
   selectedImageFile = null;
   imagePreview.style.display = 'none';
   previewImage.src = '';
-  imageInput.value = '';
+  if (imageInput) {
+    imageInput.value = '';
+  }
 }
-
-// Back button
-document.querySelector('.back-button').addEventListener('click', () => {
-  window.location.href = 'chatrooms.html';
-});

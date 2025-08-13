@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test Image Upload</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: 50px auto;
+      padding: 20px;
+    }
+    .test-section {
+      margin: 20px 0;
+      padding: 20px;
+      border: 1px solid #ddd;
+      border-radius: 10px;
+    }
+    .test-button {
+      background: #007bff;
+      color: white;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      margin: 5px;
+    }
+    .test-button:hover {
+      background: #0056b3;
+    }
+  </style>
+</head>
+<body>
+  <h1>🧪 Image Upload Testing Guide</h1>
+  
+  <div class="test-section">
+    <h2>Quick Test Setup</h2>
+    <p>Click the buttons below to test different scenarios:</p>
+    
+    <button class="test-button" onclick="openTestRoom()">
+      Open Test Room (demo-room)
+    </button>
+    
+    <button class="test-button" onclick="openTestRoom2()">
+      Open Test Room 2 (test-room)
+    </button>
+    
+    <button class="test-button" onclick="openChatrooms()">
+      Go to Chat Rooms List
+    </button>
+  </div>
+
+  <div class="test-section">
+    <h2>Manual Testing Steps</h2>
+    <ol>
+      <li>Open: <code>chat.html?roomId=demo-room</code></li>
+      <li>Click the green camera icon 📷</li>
+      <li>Select an image from your device</li>
+      <li>Check the preview appears</li>
+      <li>Click "Send" to upload</li>
+      <li>Watch the progress bar (0-100%)</li>
+      <li>Verify image appears in chat</li>
+    </ol>
+  </div>
+
+  <div class="test-section">
+    <h2>Test Images</h2>
+    <p>Create these test scenarios:</p>
+    <ul>
+      <li>Small image (< 1MB)</li>
+      <li>Large image (> 5MB - should show alert)</li>
+      <li>Different formats: JPG, PNG, GIF</li>
+    </ul>
+  </div>
+
+  <script>
+    function openTestRoom() {
+      window.location.href = 'chat.html?roomId=demo-room';
+    }
+    
+    function openTestRoom2() {
+      window.location.href = 'chat.html?roomId=test-room';
+    }
+    
+    function openChatrooms() {
+      window.location.href = 'chatrooms.html';
+    }
+  </script>
+</body>
+</html>
