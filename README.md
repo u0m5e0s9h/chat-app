@@ -307,4 +307,32 @@ Build a chatroom list page and allow per-room mute control.
   "lastMessageTimestamp": "2025-08-13T15:45:00Z"
 }
 
-# Day 5 -
+```
+
+# Day 5 – Image upload
+<img width="1671" height="843" alt="Screenshot 2025-08-13 101230" src="https://github.com/user-attachments/assets/7cee1354-1fb9-4a9b-9df2-a86f081cdd12" />
+<img width="1904" height="874" alt="Screenshot 2025-08-13 101215" src="https://github.com/user-attachments/assets/43843d77-15c3-4990-9b39-a3f4d6d4ccae" />
+
+## Objective
+Allow users to upload and send image messages.
+
+---
+
+## What Was Implemented Today
+- Added **file input** to select an image from the gallery.
+- Implemented **image upload** to Firebase Storage at:
+ - After upload, sent a chat message containing the `imageUrl`.
+- Displayed **image previews** inside chat bubbles.
+- Handled both text and image messages in the same chat UI.
+- Added **upload progress bar** to show real-time upload percentage.
+- Restricted file size to **5MB**.
+- (Optional) Added **basic image compression** before upload to optimize performance.
+
+---
+## Firebase Storage & Firestore Flow
+
+1. **User selects an image** → Triggers file input change event.
+2. **Image uploaded to Storage** → Path based on room ID & message ID.
+3. **Upload progress** tracked and displayed in UI.
+4. **Firestore message created** with `imageUrl`.
+5. **Chat UI** updates in real-time to show new image message.
