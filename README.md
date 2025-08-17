@@ -336,3 +336,95 @@ Allow users to upload and send image messages.
 3. **Upload progress** tracked and displayed in UI.
 4. **Firestore message created** with `imageUrl`.
 5. **Chat UI** updates in real-time to show new image message.
+
+
+# Day 6 – 
+
+# Day 7 – Room Members Management
+
+## Objective
+Manage membership in a room and enforce admin-only actions.
+
+## What Was Implemented Today
+
+###  Core Features Completed
+- **room_members.html** - Complete room members management page with:
+  - Member listing with avatars, display names, and role badges
+  - Admin-only actions (add/remove members)
+  - Real-time Firestore updates
+  - Protection against removing the last admin
+  - User search and selection modal for adding members
+  - Responsive design with loading/empty states
+
+###  Technical Implementation
+- **Real-time Firestore listeners** for live member updates
+- **Batch operations** for efficient member management
+- **Role-based permissions** (admin vs member)
+- **Comprehensive error handling** and user feedback
+
+###  Files Created
+- `room_members.html` - Main room members management page
+
+
+## How to Run and Test the Room Members Feature
+
+### 1. Basic Testing
+1. **Open `room_members.html?roomId=YOUR_ROOM_ID`** in your browser
+2. **Sign in with Firebase** (anonymous auth is supported)
+3. **View member list** with avatars, names, and role badges
+4. **Test admin permissions**:
+   - If you're an admin: see "Add Member" button
+   - If you're a member: see read-only view
+
+### 2. Admin Features Testing
+1. **Add new members**:
+   - Click "Add Member" button
+   - Search for users by name or email
+   - Select multiple users to add
+   - Confirm addition with batch operation
+
+2. **Remove members**:
+   - Click "Remove" button next to non-admin members
+   - Confirm removal in dialog
+   - Verify member is removed from list
+
+3. **Last admin protection**:
+   - Try to remove the last admin → should show error
+   - Verify at least one admin remains in room
+
+### 3. Real-time Testing
+1. **Open multiple browser tabs** with the same room
+2. **Add/remove members** in one tab
+3. **Verify updates** appear instantly in all tabs
+4. **Test Firestore listeners** are working correctly
+
+### 4. Firestore Structure Testing
+1. **Check Firestore console**:
+   - Verify `/chatrooms/{roomId}/members/{userId}` documents
+   - Check role field (admin/member)
+   - Verify joinedAt timestamps
+
+2. **Test member count updates**:
+   - Add/remove members
+   - Verify memberCount field updates in room document
+
+
+
+### 5. Security Testing
+1. **Test non-admin access**:
+   - Sign in as regular member
+   - Verify no admin actions are available
+   - Verify read-only access
+
+2. **Test unauthorized access**:
+   - Try to access room you're not a member of
+   - Verify appropriate error handling
+
+
+## Quick Start Guide
+
+1. **Set up Firebase** with the configuration from previous days
+2. **Update Firestore rules** with the room members rules above
+3. **Open `test-room-members.html`** for easy testing
+4. **Click test links** to open different rooms
+5. **Test all features** using the guide above
