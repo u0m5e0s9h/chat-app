@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Room Members</title>
+    <link rel="stylesheet" href="chatrooms.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <style>
+        .members-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header-section {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .room-title {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .member-card {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            margin: 10px 0;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+        }
+        
+        .member-card:hover {
+            transform: translateY(-2px);
+        }
+        
+        .member-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            margin-right: 15px;
+            object-fit: cover;
+            background-color: #ddd;
+        }
+        
+        .member-info {
+            flex: 1;
+        }
+        
+        .member-name {
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #333;
+        }
+        
+        .member-email {
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .role-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        
+        .role-admin {
+            background-color: #ff4444;
+            color: white;
+        }
+        
+        .role-member {
+            background-color: #4444ff;
+            color: white;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.2s;
+        }
+        
+        .btn-primary {
+            background-color: #007bff;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background-color: #0056b3;
+        }
+        
+        .btn-danger {
+            background-color: #dc3545;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background-color: #c82333;
+        }
+        
+        .btn-secondary {
+            background-color: #6c757d;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background-color: #545b62;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.4);
+        }
+        
+        .modal-content {
+            background-color: #fefefe;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 500px;
+            border-radius: 8px;
+        }
+        
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        .close:hover {
+            color: black;
+        }
+        
+        .user-search {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        .user-list {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        
+        .user-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .user-item:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .user-item.selected {
+            background-color: #e3f2fd;
+        }
+        
+        .pending-invites {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        
+        .pending-invites h3 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+        
+        .invite-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background: white;
+            margin: 5px 0;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="members-container">
+        <div class="header-section">
+            <div>
+                <h1 class="room-title" id="roomTitle">Room Members</h1>
+                <p id="roomDescription">Manage members in this room</p>
+            </div>
+            <button id="addMemberBtn" class="btn btn-primary" style="display: none;">
+                <i class="fas fa-plus"></i> Add Member
+            </button>
+        </div>
+
+        <div id="loadingState" class="loading">
+            <i class="fas fa-spinner fa-spin"></i> Loading members...
+        </div>
+
+        <div id="emptyState" class="empty-state" style="display: none;">
+            <i class="fas fa-users" style="font-size: 48px; color: #ddd;"></i>
+            <p>No members found in this room.</p>
+        </div>
+
+        <div id="membersList"></div>
+
+        <div class="pending-invites">
+            <h3><i class="fas fa-envelope"></i> Pending Invites</h3>
+            <div id="pendingInvitesList">
+                <p style="color: #666; font-style: italic;">No pending invites</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Member Modal -->
+    <div id="addMemberModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Add Member</h2>
+            <input type="text" id="userSearch" class="user-search" placeholder="Search users by name or email...">
+            <div id="userList" class="user-list"></div>
+            <button id="confirmAddBtn" class="btn btn-primary" disabled>Add Selected Users</button>
+        </div>
+    </div>
+
+    <script src="firebase-config.js"></script>
+    <script>
+        class RoomMembersManager {
+            constructor() {
+                this.roomId = this.getRoomIdFromUrl();
+                this.currentUser = null;
+                this.currentUserRole = null;
+                this.members = [];
+                this.unsubscribeMembers = null;
+                this.unsubscribeRoom = null;
+                
+                this.init();
+            }
+
+            getRoomIdFromUrl() {
+                const urlParams = new URLSearchParams(window.location.search);
+                return urlParams.get('roomId');
+            }
+
+            async init() {
+                if (!this.roomId) {
+                    this.showError('No room ID provided');
+                    return;
+                }
+
+                // Check authentication
+                firebase.auth().onAuthStateChanged(async (user) => {
+                    if (user) {
+                        this.currentUser = user;
+                        await this.loadRoomData();
+                        await this.setupRealtimeListeners();
+                        this.bindEvents();
+                    } else {
+                        this.showError('Please sign in to view room members');
+                    }
+                });
+            }
+
+            async loadRoomData() {
+                try {
+                    // Load room details
+                    const roomDoc = await firebase.firestore().collection('chatrooms').doc(this.roomId).get();
+                    if (!roomDoc.exists) {
+                        this.showError('Room not found');
+                        return;
+                    }
+
+                    const roomData = roomDoc.data();
+                    document.getElementById('roomTitle').textContent = roomData.title || 'Room Members';
+                    document.getElementById('roomDescription').textContent = `Manage members in "${roomData.title}"`;
+
+                    // Check current user's role
+                    const memberDoc = await firebase.firestore()
+                        .collection('chatrooms')
+                        .doc(this.roomId)
+                        .collection('members')
+                        .doc(this.currentUser.uid)
+                        .get();
+
+                    if (memberDoc.exists) {
+                        this.currentUserRole = memberDoc.data().role;
+                        if (this.currentUserRole === 'admin') {
+                            document.getElementById('addMemberBtn').style.display = 'inline-block';
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error loading room data:', error);
+                    this.showError('Error loading room data');
+                }
+            }
+
+            setupRealtimeListeners() {
+                // Listen for members changes
+                this.unsubscribeMembers = firebase.firestore()
+                    .collection('chatrooms')
+                    .doc(this.roomId)
+                    .collection('members')
+                    .onSnapshot((snapshot) => {
+                        this.handleMembersUpdate(snapshot);
+                    });
+            }
+
+            async handleMembersUpdate(snapshot) {
+                const memberIds = [];
+                const memberData = {};
+
+                snapshot.forEach(doc => {
+                    memberIds.push(doc.id);
+                    memberData[doc.id] = doc.data();
+                });
+
+                if (memberIds.length === 0) {
+                    this.showEmptyState();
+                    return;
+                }
+
+                // Get user details for all members
+                const userPromises = memberIds.map(async (userId) => {
+                    const userDoc = await firebase.firestore().collection('users').doc(userId).get();
+                    if (userDoc.exists) {
+                        return {
+                            id: userId,
+                            ...userDoc.data(),
+                            role: memberData[userId].role,
+                            joinedAt: memberData[userId].joinedAt
+                        };
+                    }
+                    return null;
+                });
+
+                const members = (await Promise.all(userPromises)).filter(m => m !== null);
+                this.members = members;
+                this.renderMembersList();
+            }
+
+            renderMembersList() {
+                const container = document.getElementById('membersList');
+                container.innerHTML = '';
+
+                if (this.members.length === 0) {
+                    this.showEmptyState();
+                    return;
+                }
+
+                this.hideLoading();
+                this.hideEmptyState();
+
+                this.members.forEach(member => {
+                    const card = this.createMemberCard(member);
+                    container.appendChild(card);
+                });
+            }
+
+            createMemberCard(member) {
+                const card = document.createElement('div');
+                card.className = 'member-card';
+                
+                const isCurrentUser = member.id === this.currentUser.uid;
+                const canRemove = this.currentUserRole === 'admin' && 
+                                member.role !== 'admin' && 
+                                !isCurrentUser;
+
+                const avatarUrl = member.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.displayName || 'User')}&background=random`;
+                
+                card.innerHTML = `
+                    <img src="${avatarUrl}" alt="${member.displayName}" class="member-avatar">
+                    <div class="member-info">
+                        <div class="member-name">
+                            ${member.displayName || 'Unknown User'}
+                            ${isCurrentUser ? '<span style="color: #666; font-size: 12px;"> (You)</span>' : ''}
+                        </div>
+                        <div class="member-email">${member.email || ''}</div>
+                    </div>
+                    <div class="action-buttons">
+                        <span class="role-badge role-${member.role}">${member.role.toUpperCase()}</span>
+                        ${canRemove ? `
+                            <button class="btn btn-danger btn-sm remove-btn" data-user-id="${member.id}">
+                                <i class="fas fa-trash"></i> Remove
+                            </button>
+                        ` : ''}
+                    </div>
+                `;
+
+                // Add remove event listener
+                const removeBtn = card.querySelector('.remove-btn');
+                if (removeBtn) {
+                    removeBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        this.removeMember(member.id);
+                    });
+                }
+
+                return card;
+            }
+
+            async removeMember(userId) {
+                if (!this.canRemoveMember()) {
+                    alert('Cannot remove the last admin from the room.');
+                    return;
+                }
+
+                if (!confirm('Are you sure you want to remove this member from the room?')) {
+                    return;
+                }
+
+                try {
+                    // Check if this would leave the room without any admins
+                    const adminCount = this.members.filter(m => m.role === 'admin').length;
+                    const memberToRemove = this.members.find(m => m.id === userId);
+                    
+                    if (memberToRemove && memberToRemove.role === 'admin' && adminCount <= 1) {
+                        alert('Cannot remove the last admin from the room.');
+                        return;
+                    }
+
+                    await firebase.firestore()
+                        .collection('chatrooms')
+                        .doc(this.roomId)
+                        .collection('members')
+                        .doc(userId)
+                        .delete();
+
+                    // Update member count
+                    await firebase.firestore()
+                        .collection('chatrooms')
+                        .doc(this.roomId)
+                        .update({
+                            memberCount: firebase.firestore.FieldValue.increment(-1)
+                        });
+
+                    console.log('Member removed successfully');
+                } catch (error) {
+                    console.error('Error removing member:', error);
+                    alert('Error removing member. Please try again.');
+                }
+            }
+
+            canRemoveMember() {
+                const adminCount = this.members.filter(m => m.role === 'admin').length;
+                return adminCount > 1;
+            }
+
+            async addMember(userId, role = 'member') {
+                try {
+                    // Check if user is already a member
+                    const existingMember = this.members.find(m => m.id === userId);
+                    if (existingMember) {
+                        alert('This user is already a member of the room.');
+                        return;
+                    }
+
+                    await firebase.firestore()
+                        .collection('chatrooms')
+                        .doc(this.roomId)
+                        .collection('members')
+                        .doc(userId)
+                        .set({
+                            role: role,
+                            joinedAt: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+
+                    // Update member count
+                    await firebase.firestore()
+                        .collection('chatrooms')
+                        .doc(this.roomId)
+                        .update({
+                            memberCount: firebase.firestore.FieldValue.increment(1)
+                        });
+
+                    console.log('Member added successfully');
+                } catch (error) {
+                    console.error('Error adding member:', error);
+                    alert('Error adding member. Please try again.');
+                }
+            }
+
+            bindEvents() {
+                // Add member button
+                document.getElementById('addMemberBtn').addEventListener('click', () => {
+                    this.openAddMemberModal();
+                });
+
+                // Modal events
+                document.querySelector('.close').addEventListener('click', () => {
+                    this.closeAddMemberModal();
+                });
+
+                document.getElementById('confirmAddBtn').addEventListener('click', () => {
+                    this.confirmAddMembers();
+                });
+
+                document.getElementById('userSearch').addEventListener('input', (e) => {
+                    this.searchUsers(e.target.value);
+                });
+
+                // Close modal when clicking outside
+                window.addEventListener('click', (e) => {
+                    if (e.target.classList.contains('modal')) {
+                        this.closeAddMemberModal();
+                    }
+                });
+            }
+
+            openAddMemberModal() {
+                document.getElementById('addMemberModal').style.display = 'block';
+                document.getElementById('userSearch').value = '';
+                document.getElementById('userList').innerHTML = '';
+                document.getElementById('confirmAddBtn').disabled = true;
+                this.selectedUsers = [];
+            }
+
+            closeAddMemberModal() {
+                document.getElementById('addMemberModal').style.display = 'none';
+                this.selectedUsers = [];
+            }
+
+            async searchUsers(query) {
+                if (query.length < 2) {
+                    document.getElementById('userList').innerHTML = '';
+                    return;
+                }
+
+                try {
+                    const usersSnapshot = await firebase.firestore()
+                        .collection('users')
+                        .where('displayName', '>=', query)
+                        .where('displayName', '<=', query + '\uf8ff')
+                        .limit(10)
+                        .get();
+
+                    const users = [];
+                    usersSnapshot.forEach(doc => {
+                        const user = { id: doc.id, ...doc.data() };
+                        if (!this.members.find(m => m.id === user.id)) {
+                            users.push(user);
+                        }
+                    });
+
+                    this.renderUserList(users);
+                } catch (error) {
+                    console.error('Error searching users:', error);
+                }
+            }
+
+            renderUserList(users) {
+                const container = document.getElementById('userList');
+                container.innerHTML = '';
+
+                if (users.length === 0) {
+                    container.innerHTML = '<p style="padding: 10px; text-align: center;">No users found</p>';
+                    return;
+                }
+
+                users.forEach(user => {
+                    const item = document.createElement('div');
+                    item.className = 'user-item';
+                    item.dataset.userId = user.id;
+                    
+                    const avatarUrl = user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName || 'User')}&background=random`;
+                    
+                    item.innerHTML = `
+                        <img src="${avatarUrl}" alt="${user.displayName}" style="width: 30px; height: 30px; border-radius: 50%; margin-right: 10px;">
+                        <div>
+                            <div style="font-weight: bold;">${user.displayName || 'Unknown User'}</div>
+                            <div style="font-size: 12px; color: #666;">${user.email || ''}</div>
+                        </div>
+                    `;
+
+                    item.addEventListener('click', () => {
+                        this.toggleUserSelection(item, user);
+                    });
+
+                    container.appendChild(item);
+                });
+            }
+
+            toggleUserSelection(element, user) {
+                const isSelected = element.classList.contains('selected');
+                
+                if (isSelected) {
+                    element.classList.remove('selected');
+                    this.selectedUsers = this.selectedUsers.filter(u => u.id !== user.id);
+                } else {
+                    element.classList.add('selected');
+                    this.selectedUsers.push(user);
+                }
+
+                document.getElementById('confirmAddBtn').disabled = this.selectedUsers.length === 0;
+            }
+
+            async confirmAddMembers() {
+                if (this.selectedUsers.length === 0) return;
+
+                try {
+                    const batch = firebase.firestore().batch();
+                    const now = firebase.firestore.FieldValue.serverTimestamp();
+
+                    this.selectedUsers.forEach(user => {
+                        const memberRef = firebase.firestore()
+                            .collection('chatrooms')
+                            .doc(this.roomId)
+                            .collection('members')
+                            .doc(user.id);
+                        
+                        batch.set(memberRef, {
+                            role: 'member',
+                            joinedAt: now
+                        });
+                    });
+
+                    await batch.commit();
+
+                    // Update member count
+                    await firebase.firestore()
+                        .collection('chatrooms')
+                        .doc(this.roomId)
+                        .update({
+                            memberCount: firebase.firestore.FieldValue.increment(this.selectedUsers.length)
+                        });
+
+                    this.closeAddMemberModal();
+                    console.log(`Added ${this.selectedUsers.length} members`);
+                } catch (error) {
+                    console.error('Error adding members:', error);
+                    alert('Error adding members. Please try again.');
+                }
+            }
+
+            showLoading() {
+                document.getElementById('loadingState').style.display = 'block';
+                document.getElementById('emptyState').style.display = 'none';
+                document.getElementById('membersList').style.display = 'none';
+            }
+
+            hideLoading() {
+                document.getElementById('loadingState').style.display = 'none';
+            }
+
+            showEmptyState() {
+                document.getElementById('loadingState').style.display = 'none';
+                document.getElementById('emptyState').style.display = 'block';
+                document.getElementById('membersList').style.display = 'none';
+            }
+
+            hideEmptyState() {
+                document.getElementById('emptyState').style.display = 'none';
+                document.getElementById('membersList').style.display = 'block';
+            }
+
+            showError(message) {
+                document.getElementById('loadingState').innerHTML = `
+                    <i class="fas fa-exclamation-triangle"></i> ${message}
+                `;
+            }
+
+            destroy() {
+                if (this.unsubscribeMembers) {
+                    this.unsubscribeMembers();
+                }
+                if (this.unsubscribeRoom) {
+                    this.unsubscribeRoom();
+                }
+            }
+        }
+
+        // Initialize when DOM is loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            window.roomMembersManager = new RoomMembersManager();
+        });
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (window.roomMembersManager) {
+                window.roomMembersManager.destroy();
+            }
+        });
+    </script>
+</body>
+</html>
