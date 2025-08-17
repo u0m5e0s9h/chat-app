@@ -338,7 +338,150 @@ Allow users to upload and send image messages.
 5. **Chat UI** updates in real-time to show new image message.
 
 
-# Day 6 – 
+# Day 6 –  User Profile & Room Creation Features
+
+##  Features Implemented
+
+### 1. User Profile Persistence
+- **User Profile Management**: Automatic user profile creation/updating on login
+- **Searchable Users**: Typeahead search functionality for users by name/email
+- **Profile Storage**: Complete user profiles with displayName, email, photoUrl, and search keys
+
+### 2. Room Creation System
+- **Room Creation**: Complete room creation with title, initial members, and proper Firestore structure
+- **Member Management**: Add/remove members from existing rooms
+- **Role Management**: Creator as admin, members with appropriate roles
+- **Validation**: Local duplicate title validation
+
+### 3. Firebase Integration
+- **Firestore Collections**: Properly structured collections for users, chatrooms, and members
+- **Authentication**: Anonymous authentication with user profile persistence
+- **Storage**: Firebase Storage integration for file uploads
+
+
+## Setup Instructions
+
+### 1. Firebase Configuration
+Update `firebase-config.js` with your Firebase project details:
+```javascript
+const firebaseConfig = {
+  apiKey: "your-actual-api-key",
+  authDomain: "your-project.firebaseapp.com",
+  projectId: "your-project-id",
+  storageBucket: "your-project.appspot.com",
+  messagingSenderId: "your-sender-id",
+  appId: "your-app-id"
+};
+```
+
+### 2. Environment Setup
+1. Clone or download the project
+2. Ensure Firebase SDK is loaded:
+   ```html
+   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+   ```
+
+##  Testing Instructions
+
+### 1. User Profile Testing
+```javascript
+
+const userManager = new UserManager();
+await userManager.init();
+```
+
+### 2. Room Creation Testing
+```javascript
+
+const roomManager = new RoomManager();
+const room = await roomManager.createRoom(
+    "Test Room",
+    ["user1", "user2", "user3"],
+    "currentUserId"
+);
+```
+
+### 3. Member Management Testing
+```javascript
+
+await roomManager.addMemberToRoom("roomId", "newUserId", "member");
+```
+
+### 4. User Search Testing
+```javascript
+
+const users = await userManager.searchUsers("test");
+```
+
+
+##  Testing Commands
+
+### 1. Test User Creation
+```bash
+
+const userManager = new UserManager();
+await userManager.init();
+```
+
+### 2. Test Room Creation
+```bash
+
+const roomManager = new RoomManager();
+await roomManager.createRoom("Test Room", ["user1", "user2"], "currentUser");
+```
+
+### 3. Test Member Search
+```bash
+
+const users = await userManager.searchUsers("test");
+```
+
+##  Firestore Structure
+
+### Users Collection
+```javascript
+users/{uid}: {
+  displayName: string,
+  email: string,
+  photoUrl: string,
+  createdAt: timestamp,
+  updatedAt: timestamp,
+  searchKeys: [string]
+}
+```
+
+### Chatrooms Collection
+```javascript
+chatrooms/{roomId}: {
+  type: "group",
+  title: string,
+  createdBy: string,
+  createdAt: timestamp,
+  memberCount: number
+}
+```
+
+### Members Collection
+```javascript
+chatrooms/{roomId}/members/{uid}: {
+  role: "admin" | "member",
+  joinedAt: timestamp
+}
+```
+
+##  Quick Start
+
+1. **Clone the repository**
+2. **Update Firebase configuration** in `firebase-config.js`
+3. **Open `chatrooms.html`** in your browser
+4. **Test user registration** by logging in (anonymous auth)
+5. **Create a new room** using the room creation dialog
+6. **Test member addition** and search functionality
+
+
+
 
 # Day 7 – Room Members Management
 
@@ -428,3 +571,4 @@ Manage membership in a room and enforce admin-only actions.
 3. **Open `test-room-members.html`** for easy testing
 4. **Click test links** to open different rooms
 5. **Test all features** using the guide above
+
