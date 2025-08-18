@@ -13,11 +13,19 @@
     <header class="top-bar">
       <button class="back-button">←</button>
       <h1 class="room-title">Chat Room</h1>
+      <div class="online-indicator">
+        <span class="online-count">0 online</span>
+      </div>
     </header>
 
     <!-- Chat Messages Area -->
     <div class="chat-area">
       <!-- Messages will be loaded dynamically -->
+    </div>
+    
+    <!-- Typing Indicator -->
+    <div id="typingIndicator" class="typing-indicator" style="display: none;">
+      <span id="typingText"></span>
     </div>
 
     <!-- Image Preview -->
@@ -55,6 +63,8 @@
   
   <!-- App scripts -->
   <script src="firebase-config.js"></script>
+  <script src="presence-manager.js"></script>
+  <script src="typing-manager.js"></script>
   <script src="chat-firebase.js"></script>
 </body>
 </html>
