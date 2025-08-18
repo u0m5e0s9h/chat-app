@@ -572,3 +572,191 @@ Manage membership in a room and enforce admin-only actions.
 4. **Click test links** to open different rooms
 5. **Test all features** using the guide above
 
+
+
+# Day 8 – Online Presence & Typing Indicators
+
+
+## What Was Implemented Today
+
+### Online Presence System
+- **Real-time online user tracking** using Firestore
+- **Presence collection**: `/presence/{userId}` with `lastActiveAt` timestamp
+- **Automatic updates** on user activity (focus, typing, heartbeat)
+- **Online count display** in chat room header
+- **30-second heartbeat** to maintain presence
+- **Graceful cleanup** on page unload
+
+###  Typing Indicators
+- **Real-time typing detection** with debouncing
+- **Typing collection**: `/typing/{roomId}/users/{userId}`
+- **Smart aggregation** for multiple users typing
+- **5-second timeout** for inactive typing
+- **Rate limiting** (1 write per second)
+- **Debounced input** (300ms delay)
+
+###  UI Enhancements
+- **Online count badge** in chat room header
+- **"X is typing..." indicator** below chat messages
+- **Multi-user typing** support ("X and Y are typing...")
+- **Responsive design** for mobile devices
+- **Clean visual indicators** with smooth transitions
+
+###  Performance Optimizations
+- **Client-side throttling** to reduce writes
+- **Automatic cleanup** of expired typing indicators
+- **Efficient Firestore listeners** with proper cleanup
+- **Memory management** on page navigation
+
+## Files Created Today
+
+### New Files:
+- **`presence-manager.js`** - Handles online presence tracking
+- **`typing-manager.js`** - Manages typing indicators with debouncing
+
+### Modified Files:
+- **`chat.html`** - Added online count and typing indicator UI
+- **`chat.css`** - Styled new presence and typing indicators
+- **`chat-firebase.js`** - Integrated presence and typing functionality
+
+## How to Run and Test
+
+### 1. Basic Setup
+1. **Update Firebase configuration** in `firebase-config.js` with your project details
+2. **Add Firestore security rules** (see rules below)
+3. **Open `chat.html`** in your browser with a valid room ID
+
+### 2. Testing Online Presence
+1. **Open multiple browser tabs** with the same room
+2. **Check online count** in the top-right corner
+3. **Close a tab** - count should decrease after 30 seconds
+4. **Switch between tabs** - presence updates on focus
+
+### 3. Testing Typing Indicators
+1. **Open 2+ browser tabs** with different users
+2. **Start typing** in the message input
+3. **See "X is typing..."** appear in other tabs
+4. **Stop typing** - indicator disappears after 5 seconds
+5. **Send a message** - typing indicator clears immediately
+
+### 4. Multi-User Testing
+1. **Open 3+ browser tabs** with different users
+2. **Have multiple users type simultaneously**
+3. **See aggregated messages** like:
+   - "Alice is typing..."
+   - "Alice and Bob are typing..."
+   - "Alice and 2 others are typing..."
+
+### 5. Performance Testing
+1. **Open browser console** (F12)
+2. **Watch console logs** for:
+   - "Updating presence..."
+   - "Starting typing..."
+   - "Clearing typing..."
+3. **Check Firestore** for presence and typing collections
+
+
+
+## Firestore Security Rules
+
+Add these rules to your Firestore security rules:
+
+```javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Presence rules
+    match /presence/{userId} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Typing rules
+    match /typing/{roomId}/users/{userId} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Existing rules for messages
+    match /chatrooms/{roomId}/messages/{messageId} {
+      allow read: if true;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null 
+        && request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['readBy']);
+    }
+  }
+}
+```
+
+## Quick Start Guide
+
+### 1. Setup Firebase
+1. Go to [Firebase Console](https://console.firebase.google.com/)
+2. Create a new project or use existing
+3. Enable **Authentication** > **Anonymous** sign-in
+4. Enable **Firestore Database**
+5. Add the security rules above
+
+### 2. Update Configuration
+1. Open `firebase-config.js`
+2. Replace with your Firebase project config:
+   ```javascript
+   const firebaseConfig = {
+     apiKey: "your-actual-api-key",
+     authDomain: "your-project.firebaseapp.com",
+     projectId: "your-project-id",
+     storageBucket: "your-project.appspot.com",
+     messagingSenderId: "your-sender-id",
+     appId: "your-app-id"
+   };
+   ```
+
+### 3. Test the Features
+1. **Open `chat.html`** in your browser
+2. **Add `?roomId=test` to URL** if needed
+3. **Open multiple tabs** to test real-time features
+4. **Start typing** to see typing indicators
+5. **Check online count** in the header
+
+## Testing Commands
+
+### Browser Console Testing
+```javascript
+// Test presence updates
+presenceManager.updatePresence();
+
+// Test typing indicators
+typingManager.startTyping();
+
+// Check online users
+presenceManager.getOnlineUsers().then(users => console.log(users));
+
+// Check typing users
+typingManager.getTypingUsers().then(users => console.log(users));
+```
+
+### URL Testing
+```
+chat.html?roomId=general
+chat.html?roomId=random
+chat.html?roomId=testing
+```
+
+## Troubleshooting
+
+### Presence not updating?
+- Check Firestore console for `/presence` collection
+- Verify user authentication is working
+- Check browser console for errors
+
+### Typing indicators not showing?
+- Ensure `/typing` collection has documents
+- Check if debounce delay is working (300ms)
+- Verify rate limiting isn't blocking writes
+
+### Online count incorrect?
+- Check if heartbeat is running (30-second intervals)
+- Verify cleanup on page unload is working
+- Check Firestore timestamps are correct
+
