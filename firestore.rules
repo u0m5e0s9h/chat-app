@@ -1,0 +1,82 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    
+    function isRoomMember(roomId) {
+      return exists(/databases/$(database)/documents/chatrooms/$(roomId)/members/$(request.auth.uid));
+    }
+    
+    function isRoomAdmin(roomId) {
+      return get(/databases/$(database)/documents/chatrooms/$(roomId)/members/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    function isValidMessage() {
+      return request.resource.data.senderId == request.auth.uid;
+    }
+    
+    // Chatrooms collection
+    match /chatrooms/{roomId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && isRoomAdmin(roomId);
+      allow delete: if false;
+    }
+    
+    // Messages subcollection
+    match /chatrooms/{roomId}/messages/{messageId} {
+      allow read: if isAuthenticated() && isRoomMember(roomId);
+      allow create: if isAuthenticated() && isRoomMember(roomId) && isValidMessage();
+      allow update: if isAuthenticated() && isRoomMember(roomId) && isOwner(resource.data.senderId);
+      allow delete: if isAuthenticated() && isRoomMember(roomId) && isOwner(resource.data.senderId);
+    }
+    
+    // Members subcollection
+    match /chatrooms/{roomId}/members/{userId} {
+      allow read: if isAuthenticated() && isRoomMember(roomId);
+      allow create: if isAuthenticated() && isRoomAdmin(roomId);
+      allow update: if isAuthenticated() && (isRoomAdmin(roomId) || isOwner(userId));
+      allow delete: if isAuthenticated() && (isRoomAdmin(roomId) || isOwner(userId));
+    }
+    
+    // Reads collection for tracking read status
+    match /reads/{userId}/rooms/{roomId} {
+      allow read: if isAuthenticated() && isOwner(userId);
+      allow write: if isAuthenticated() && isOwner(userId);
+    }
+    
+    // Mutes collection for room mute status
+    match /mutes/{userId}/rooms/{roomId} {
+      allow read: if isAuthenticated() && isOwner(userId);
+      allow write: if isAuthenticated() && isOwner(userId);
+    }
+    
+    // Presence collection for online status
+    match /presence/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isOwner(userId);
+    }
+    
+    // Typing collection for typing indicators
+    match /typing/{roomId}/users/{userId} {
+      allow read: if isAuthenticated() && isRoomMember(roomId);
+      allow write: if isAuthenticated() && isRoomMember(roomId) && isOwner(userId);
+    }
+    
+    // User profiles
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isOwner(userId);
+      allow update: if isAuthenticated() && isOwner(userId);
+      allow delete: if false;
+    }
+  }
+}
