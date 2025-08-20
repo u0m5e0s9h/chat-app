@@ -863,7 +863,7 @@ open chat.html?roomId=test&pagination=true
 
 ---
 
-## 🌐 Testing URLs
+##  Testing URLs
 - `chat.html?roomId=general`
 - `chat.html?roomId=random`
 - `chat.html?roomId=testing`
@@ -895,7 +895,9 @@ await pagination.updateUnreadCount();
 
 
 
-# Day 9 - Efficient History Loading & Message Search
+
+
+# Day 10 -  Security Rules, Negative Tests (Emulator), and UX Polish
 
 ## Phase 1: Firestore Security Rules
 -  Create comprehensive firestore.rules file
@@ -927,4 +929,14 @@ await pagination.updateUnreadCount();
 -  Improve focus order
 -  Add keyboard navigation support
 
+## Phase 5: CI/CD Setup
+-  Create GitHub Actions workflow
+-  Set up Firebase emulator in CI
+-  Add test execution to workflow
+-  Add deployment steps for rules
 
+## Phase 6: Testing & Validation
+-  Run all emulator tests locally
+-  Test UI changes across devices
+-  Validate accessibility improvements
+-  Test CI/CD pipeline
